@@ -252,4 +252,118 @@ mod tests {
 
         assert!(bc.validate().is_err());
     }
+
+    #[test]
+    fn test_transfer_transaction() {
+        let mut bc = Blockchain::new();
+
+        let tx_create_account =
+            Transaction::new(TransactionData::CreateAccount("satoshi".to_string()), None);
+        let tx_mint_initial_supply = Transaction::new(
+            TransactionData::MintInitialSupply {
+                to: "satoshi".to_string(),
+                amount: 100_000_000,
+            },
+            None,
+        );
+
+        let tx_create_alice =
+            Transaction::new(TransactionData::CreateAccount("alice".to_string()), None);
+        let tx_mint_initial_supply_alice = Transaction::new(
+                TransactionData::MintInitialSupply {
+                    to: "alice".to_string(),
+                    amount: 100_000,
+                },
+                None,
+        );
+
+        let mut block = Block::new(None);
+        block.set_nonce(1);
+        block.add_transaction(tx_create_account);
+        block.add_transaction(tx_mint_initial_supply);
+        block.add_transaction(tx_create_alice);
+        block.add_transaction(tx_mint_initial_supply_alice);
+
+        assert!(bc.append_block(block).is_ok());
+
+        let mut block = Block::new(bc.get_last_block_hash());
+        let tx_transfer_satoshi_to_alice = Transaction::new(
+                TransactionData::Transfer{
+                    to: "alice".to_string(),
+                    amount: 1000,
+                },
+                Some("satoshi".to_string()),
+        );
+        block.set_nonce(2);
+        block.add_transaction(tx_transfer_satoshi_to_alice);
+
+        assert!(bc.append_block(block).is_ok());
+
+        let satoshi = bc.get_account_by_id("satoshi".to_string());
+
+        assert!(satoshi.is_some());
+        assert_eq!(satoshi.unwrap().balance, 99_999_000);
+
+        let alice = bc.get_account_by_id("alice".to_string());
+
+        assert!(alice.is_some());
+        assert_eq!(alice.unwrap().balance, 101_000);
+    }
+
+    #[test]
+    fn test_transfer_transaction_fails() {
+        let mut bc = Blockchain::new();
+
+        let tx_create_account =
+            Transaction::new(TransactionData::CreateAccount("satoshi".to_string()), None);
+        let tx_mint_initial_supply = Transaction::new(
+            TransactionData::MintInitialSupply {
+                to: "satoshi".to_string(),
+                amount: 100_000_000,
+            },
+            None,
+        );
+
+        let tx_create_alice =
+            Transaction::new(TransactionData::CreateAccount("alice".to_string()), None);
+        let tx_mint_initial_supply_alice = Transaction::new(
+                TransactionData::MintInitialSupply {
+                    to: "alice".to_string(),
+                    amount: 100_000,
+                },
+                None,
+        );
+
+        let mut block = Block::new(None);
+        block.set_nonce(1);
+        block.add_transaction(tx_create_account);
+        block.add_transaction(tx_mint_initial_supply);
+        block.add_transaction(tx_create_alice);
+        block.add_transaction(tx_mint_initial_supply_alice);
+
+        assert!(bc.append_block(block).is_ok());
+
+        let mut block = Block::new(bc.get_last_block_hash());
+        let tx_transfer_satoshi_to_alice = Transaction::new(
+                TransactionData::Transfer{
+                    to: "satoshi".to_string(),
+                    amount: 102_000,
+                },
+                Some("alice".to_string()),
+        );
+        block.set_nonce(2);
+        block.add_transaction(tx_transfer_satoshi_to_alice);
+
+        assert!(bc.append_block(block).is_err());
+
+        let satoshi = bc.get_account_by_id("satoshi".to_string());
+
+        assert!(satoshi.is_some());
+        assert_eq!(satoshi.unwrap().balance, 100_000_000);
+
+        let alice = bc.get_account_by_id("alice".to_string());
+
+        assert!(alice.is_some());
+        assert_eq!(alice.unwrap().balance, 100_000);
+    }
 }
