@@ -53,7 +53,51 @@ impl Transaction {
             // 2. Check sender balance
             // 3. Change sender/receiver balances and save to state
             // 4. Test
-            TransactionData::Transfer { to, amount } => Ok(()),
+            TransactionData::Transfer { to, amount } => {
+                let sender;
+                let receiver;
+                if matches!(state.get_account_by_id_mut(self.from.as_ref().unwrap().clone()), Some(account))
+                {
+                    sender = state.get_account_by_id_mut(self.from.as_ref().unwrap().clone()).unwrap().clone();
+                }
+                else
+                {
+                    return Err("Invalid sender account.".to_string());
+                }
+                if matches!(state.get_account_by_id_mut(to.clone()), Some(account))
+                {
+                    receiver = state.get_account_by_id_mut(to.clone()).unwrap().clone();
+                }
+                else
+                {
+                    return Err("Invalid receiver account.".to_string());
+                }
+
+                if sender.balance < *amount
+                {
+                    return Err("Insufficient balance".to_string());
+                }
+                if u128::MAX - *amount < receiver.balance
+                {
+                    return Err("Type overflow".to_string());
+                }
+
+                match state.get_account_by_id_mut(self.from.as_ref().unwrap().clone()) {
+                    Some(account) => {
+                        account.balance -= amount;
+                    }
+                    None => return Err("Invalid sender account.".to_string()),
+                }
+
+                match state.get_account_by_id_mut(to.clone()) {
+                    Some(account) => {
+                        account.balance += amount;
+                    }
+                    None => return Err("Invalid receiver account.".to_string()),
+                }
+
+                return Ok(());
+            },
         }
     }
 }
