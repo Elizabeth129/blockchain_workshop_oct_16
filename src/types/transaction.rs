@@ -55,10 +55,19 @@ impl Transaction {
             // 4. Test
             TransactionData::Transfer { to, amount } => {
                 let sender;
+                let senderId;
                 let receiver;
-                if matches!(state.get_account_by_id_mut(self.from.as_ref().unwrap().clone()), Some(account))
+                
+                match &self.from {
+                    Some(account_id) => {
+                        senderId = self.from.as_ref().unwrap().clone();
+                    }
+                    None => return Err("Invalid sender ID.".to_string()),
+                }
+                
+                if matches!(state.get_account_by_id_mut(senderId.clone()), Some(account))
                 {
-                    sender = state.get_account_by_id_mut(self.from.as_ref().unwrap().clone()).unwrap().clone();
+                    sender = state.get_account_by_id_mut(senderId.clone()).unwrap().clone();
                 }
                 else
                 {
@@ -82,7 +91,7 @@ impl Transaction {
                     return Err("Type overflow".to_string());
                 }
 
-                match state.get_account_by_id_mut(self.from.as_ref().unwrap().clone()) {
+                match state.get_account_by_id_mut(senderId.clone()) {
                     Some(account) => {
                         account.balance -= amount;
                     }
