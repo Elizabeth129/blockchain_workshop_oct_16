@@ -2,6 +2,7 @@ use crate::traits::Hashable;
 use crate::types::{Hash, Transaction};
 use blake2::digest::FixedOutput;
 use blake2::{Blake2s, Digest};
+use ed25519_dalek::{Keypair};
 
 #[derive(Default, Debug, Clone)]
 pub struct Block {
@@ -61,7 +62,8 @@ mod tests {
     #[test]
     fn test_creation() {
         let mut block = Block::new(None);
-        let tx = Transaction::new(TransactionData::CreateAccount("alice".to_string()), None);
+        let keypair = Keypair::generate(&mut rand::rngs::OsRng {});
+        let tx = Transaction::new(TransactionData::CreateAccount("alice".to_string(), keypair.public), None);
         block.set_nonce(1);
         block.add_transaction(tx);
 
@@ -71,7 +73,8 @@ mod tests {
     #[test]
     fn test_hash() {
         let mut block = Block::new(None);
-        let tx = Transaction::new(TransactionData::CreateAccount("alice".to_string()), None);
+        let keypair = Keypair::generate(&mut rand::rngs::OsRng {});
+        let tx = Transaction::new(TransactionData::CreateAccount("alice".to_string(), keypair.public), None);
         block.set_nonce(1);
 
         let hash1 = block.hash();

@@ -1,5 +1,6 @@
 use crate::traits::{Hashable, WorldState};
 use crate::types::{AccountId, AccountType, Balance, Error, Hash, Timestamp};
+use ed25519_dalek::{Verifier, PublicKey, Signature};
 use blake2::digest::FixedOutput;
 use blake2::{Blake2s, Digest};
 
@@ -9,12 +10,12 @@ pub struct Transaction {
     timestamp: Timestamp,
     from: Option<AccountId>,
     pub(crate) data: TransactionData,
-    signature: Option<String>,
+    signature: Option<Signature>,
 }
 
 #[derive(Debug, Clone)]
 pub enum TransactionData {
-    CreateAccount(AccountId),
+    CreateAccount(AccountId, PublicKey),
     MintInitialSupply { to: AccountId, amount: Balance },
     Transfer { to: AccountId, amount: Balance },
 }
@@ -30,11 +31,16 @@ impl Transaction {
         }
     }
 
+    pub fn sign(&mut self, signature: Option<Signature>)
+    {
+        self.signature = signature;
+    }
+
     pub fn execute<T: WorldState>(&self, state: &mut T, is_genesis: bool) -> Result<(), Error> {
         //TODO Task 2: Implement signature
         match &self.data {
-            TransactionData::CreateAccount(account_id) => {
-                state.create_account(account_id.clone(), AccountType::User)
+            TransactionData::CreateAccount(account_id, public_key) => {
+                state.create_account(account_id.clone(), AccountType::User, public_key.clone())
             }
             TransactionData::MintInitialSupply { to, amount } => {
                 if !is_genesis {
@@ -60,7 +66,7 @@ impl Transaction {
                 
                 match &self.from {
                     Some(account_id) => {
-                        senderId = self.from.as_ref().unwrap().clone();
+                        senderId = account_id.clone();
                     }
                     None => return Err("Invalid sender ID.".to_string()),
                 }
@@ -80,6 +86,17 @@ impl Transaction {
                 else
                 {
                     return Err("Invalid receiver account.".to_string());
+                }
+
+                match &self.signature
+                {
+                    Some(signature) => {
+                        if !sender.public_key.verify(self.hash().as_bytes(), &Signature::from(signature.to_bytes())).is_ok()
+                        {
+                            return Err("Invalid signature.".to_string());
+                        }
+                    }
+                    None => return Err("Not sign.".to_string()),
                 }
 
                 if sender.balance < *amount

@@ -1,5 +1,6 @@
 use crate::traits::{Hashable, WorldState};
 use crate::types::{Account, AccountId, AccountType, Block, Chain, Error, Hash, Transaction};
+use ed25519_dalek::{Keypair, Signature, Signer, PublicKey};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
@@ -15,11 +16,12 @@ impl WorldState for Blockchain {
         &mut self,
         account_id: AccountId,
         account_type: AccountType,
+        public_key: PublicKey,
     ) -> Result<(), Error> {
         match self.accounts.entry(account_id.clone()) {
             Entry::Occupied(_) => Err(format!("AccountId already exist: {}", account_id)),
             Entry::Vacant(v) => {
-                v.insert(Account::new(account_type));
+                v.insert(Account::new(account_type, public_key));
                 Ok(())
             }
         }
@@ -139,8 +141,9 @@ mod tests {
     fn test_create_genesis_block() {
         let bc = &mut Blockchain::new();
 
+        let keypair = Keypair::generate(&mut rand::rngs::OsRng {});
         let tx_create_account =
-            Transaction::new(TransactionData::CreateAccount("satoshi".to_string()), None);
+            Transaction::new(TransactionData::CreateAccount("satoshi".to_string(), keypair.public), None);
         let tx_mint_initial_supply = Transaction::new(
             TransactionData::MintInitialSupply {
                 to: "satoshi".to_string(),
@@ -162,8 +165,9 @@ mod tests {
     fn test_create_genesis_block_fails() {
         let mut bc = Blockchain::new();
 
+        let keypair = Keypair::generate(&mut rand::rngs::OsRng {});
         let tx_create_account =
-            Transaction::new(TransactionData::CreateAccount("satoshi".to_string()), None);
+            Transaction::new(TransactionData::CreateAccount("satoshi".to_string(), keypair.public), None);
         let tx_mint_initial_supply = Transaction::new(
             TransactionData::MintInitialSupply {
                 to: "satoshi".to_string(),
@@ -186,8 +190,9 @@ mod tests {
     fn test_state_rollback_works() {
         let mut bc = Blockchain::new();
 
+        let keypair = Keypair::generate(&mut rand::rngs::OsRng {});
         let tx_create_account =
-            Transaction::new(TransactionData::CreateAccount("satoshi".to_string()), None);
+            Transaction::new(TransactionData::CreateAccount("satoshi".to_string(), keypair.public), None);
         let tx_mint_initial_supply = Transaction::new(
             TransactionData::MintInitialSupply {
                 to: "satoshi".to_string(),
@@ -203,10 +208,12 @@ mod tests {
         assert!(bc.append_block(block).is_ok());
 
         let mut block = Block::new(bc.get_last_block_hash());
+        let keypair_alice = Keypair::generate(&mut rand::rngs::OsRng {});
         let tx_create_alice =
-            Transaction::new(TransactionData::CreateAccount("alice".to_string()), None);
+            Transaction::new(TransactionData::CreateAccount("alice".to_string(), keypair_alice.public), None);
+        let keypair_bob = Keypair::generate(&mut rand::rngs::OsRng {});
         let tx_create_bob =
-            Transaction::new(TransactionData::CreateAccount("bob".to_string()), None);
+            Transaction::new(TransactionData::CreateAccount("bob".to_string(), keypair_bob.public), None);
         block.set_nonce(2);
         block.add_transaction(tx_create_alice);
         block.add_transaction(tx_create_bob.clone());
@@ -223,8 +230,9 @@ mod tests {
     fn test_validate() {
         let bc = &mut Blockchain::new();
 
+        let keypair = Keypair::generate(&mut rand::rngs::OsRng {});
         let tx_create_account =
-            Transaction::new(TransactionData::CreateAccount("satoshi".to_string()), None);
+            Transaction::new(TransactionData::CreateAccount("satoshi".to_string(), keypair.public), None);
         let tx_mint_initial_supply = Transaction::new(
             TransactionData::MintInitialSupply {
                 to: "satoshi".to_string(),
@@ -257,8 +265,9 @@ mod tests {
     fn test_transfer_transaction() {
         let mut bc = Blockchain::new();
 
+        let keypair = Keypair::generate(&mut rand::rngs::OsRng {});
         let tx_create_account =
-            Transaction::new(TransactionData::CreateAccount("satoshi".to_string()), None);
+            Transaction::new(TransactionData::CreateAccount("satoshi".to_string(), keypair.public), None);
         let tx_mint_initial_supply = Transaction::new(
             TransactionData::MintInitialSupply {
                 to: "satoshi".to_string(),
@@ -267,8 +276,9 @@ mod tests {
             None,
         );
 
+        let keypair_alice = Keypair::generate(&mut rand::rngs::OsRng {});
         let tx_create_alice =
-            Transaction::new(TransactionData::CreateAccount("alice".to_string()), None);
+            Transaction::new(TransactionData::CreateAccount("alice".to_string(), keypair_alice.public), None);
         let tx_mint_initial_supply_alice = Transaction::new(
                 TransactionData::MintInitialSupply {
                     to: "alice".to_string(),
@@ -287,13 +297,15 @@ mod tests {
         assert!(bc.append_block(block).is_ok());
 
         let mut block = Block::new(bc.get_last_block_hash());
-        let tx_transfer_satoshi_to_alice = Transaction::new(
+        let mut tx_transfer_satoshi_to_alice = Transaction::new(
                 TransactionData::Transfer{
                     to: "alice".to_string(),
                     amount: 1000,
                 },
                 Some("satoshi".to_string()),
         );
+        tx_transfer_satoshi_to_alice.sign(Some(keypair.sign(tx_transfer_satoshi_to_alice.hash().as_bytes())));
+
         block.set_nonce(2);
         block.add_transaction(tx_transfer_satoshi_to_alice);
 
@@ -314,8 +326,9 @@ mod tests {
     fn test_transfer_transaction_fails() {
         let mut bc = Blockchain::new();
 
+        let keypair = Keypair::generate(&mut rand::rngs::OsRng {});
         let tx_create_account =
-            Transaction::new(TransactionData::CreateAccount("satoshi".to_string()), None);
+            Transaction::new(TransactionData::CreateAccount("satoshi".to_string(), keypair.public), None);
         let tx_mint_initial_supply = Transaction::new(
             TransactionData::MintInitialSupply {
                 to: "satoshi".to_string(),
@@ -324,8 +337,9 @@ mod tests {
             None,
         );
 
+        let keypair_alice = Keypair::generate(&mut rand::rngs::OsRng {});
         let tx_create_alice =
-            Transaction::new(TransactionData::CreateAccount("alice".to_string()), None);
+            Transaction::new(TransactionData::CreateAccount("alice".to_string(), keypair_alice.public), None);
         let tx_mint_initial_supply_alice = Transaction::new(
                 TransactionData::MintInitialSupply {
                     to: "alice".to_string(),
@@ -344,13 +358,74 @@ mod tests {
         assert!(bc.append_block(block).is_ok());
 
         let mut block = Block::new(bc.get_last_block_hash());
-        let tx_transfer_satoshi_to_alice = Transaction::new(
+        let mut tx_transfer_satoshi_to_alice = Transaction::new(
                 TransactionData::Transfer{
                     to: "satoshi".to_string(),
                     amount: 102_000,
                 },
                 Some("alice".to_string()),
         );
+        tx_transfer_satoshi_to_alice.sign(Some(keypair_alice.sign(tx_transfer_satoshi_to_alice.hash().as_bytes())));
+        block.set_nonce(2);
+        block.add_transaction(tx_transfer_satoshi_to_alice);
+
+        assert!(bc.append_block(block).is_err());
+
+        let satoshi = bc.get_account_by_id("satoshi".to_string());
+
+        assert!(satoshi.is_some());
+        assert_eq!(satoshi.unwrap().balance, 100_000_000);
+
+        let alice = bc.get_account_by_id("alice".to_string());
+
+        assert!(alice.is_some());
+        assert_eq!(alice.unwrap().balance, 100_000);
+    }
+
+    #[test]
+    fn test_transfer_transaction_sign_fails() {
+        let mut bc = Blockchain::new();
+
+        let keypair = Keypair::generate(&mut rand::rngs::OsRng {});
+        let tx_create_account =
+            Transaction::new(TransactionData::CreateAccount("satoshi".to_string(), keypair.public), None);
+        let tx_mint_initial_supply = Transaction::new(
+            TransactionData::MintInitialSupply {
+                to: "satoshi".to_string(),
+                amount: 100_000_000,
+            },
+            None,
+        );
+
+        let keypair_alice = Keypair::generate(&mut rand::rngs::OsRng {});
+        let tx_create_alice =
+            Transaction::new(TransactionData::CreateAccount("alice".to_string(), keypair_alice.public), None);
+        let tx_mint_initial_supply_alice = Transaction::new(
+                TransactionData::MintInitialSupply {
+                    to: "alice".to_string(),
+                    amount: 100_000,
+                },
+                None,
+        );
+
+        let mut block = Block::new(None);
+        block.set_nonce(1);
+        block.add_transaction(tx_create_account);
+        block.add_transaction(tx_mint_initial_supply);
+        block.add_transaction(tx_create_alice);
+        block.add_transaction(tx_mint_initial_supply_alice);
+
+        assert!(bc.append_block(block).is_ok());
+
+        let mut block = Block::new(bc.get_last_block_hash());
+        let mut tx_transfer_satoshi_to_alice = Transaction::new(
+                TransactionData::Transfer{
+                    to: "satoshi".to_string(),
+                    amount: 2_000,
+                },
+                Some("alice".to_string()),
+        );
+        tx_transfer_satoshi_to_alice.sign(Some(keypair.sign(tx_transfer_satoshi_to_alice.hash().as_bytes())));
         block.set_nonce(2);
         block.add_transaction(tx_transfer_satoshi_to_alice);
 
