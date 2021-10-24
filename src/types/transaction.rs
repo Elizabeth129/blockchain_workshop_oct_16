@@ -7,7 +7,7 @@ use blake2::{Blake2s, Digest};
 #[derive(Debug, Clone)]
 pub struct Transaction {
     nonce: u128,
-    timestamp: Timestamp,
+    pub(crate) timestamp: Timestamp,
     from: Option<AccountId>,
     pub(crate) data: TransactionData,
     signature: Option<Signature>,
@@ -21,10 +21,10 @@ pub enum TransactionData {
 }
 
 impl Transaction {
-    pub fn new(data: TransactionData, from: Option<AccountId>) -> Self {
+    pub fn new(data: TransactionData, from: Option<AccountId>, timestamp: Timestamp) -> Self {
         Self {
             nonce: 0,
-            timestamp: 0,
+            timestamp,
             from,
             data,
             signature: None,

@@ -1,6 +1,7 @@
 use crate::types::{AccountId, Block, Blockchain, Error, Transaction, TransactionData};
 use blake2::{Blake2s, Digest};
 use ed25519_dalek::{Keypair};
+use std::time::{SystemTime, UNIX_EPOCH};
 use rand::Rng;
 
 pub fn generate_account_id() -> AccountId {
@@ -13,8 +14,9 @@ pub fn generate_account_id() -> AccountId {
 pub fn append_block(bc: &mut Blockchain, nonce: u128) -> Block {
     let mut block = Block::new(bc.get_last_block_hash());
     let keypair = Keypair::generate(&mut rand::rngs::OsRng {});
+    let time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs() as u128;
     let tx_create_account =
-        Transaction::new(TransactionData::CreateAccount(generate_account_id(), keypair.public), None);
+        Transaction::new(TransactionData::CreateAccount(generate_account_id(), keypair.public), None, time);
     block.set_nonce(nonce);
     block.add_transaction(tx_create_account);
     let block_clone = block.clone();

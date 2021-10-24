@@ -3,6 +3,7 @@ use crate::types::{Hash, Transaction};
 use blake2::digest::FixedOutput;
 use blake2::{Blake2s, Digest};
 use ed25519_dalek::{Keypair};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Default, Debug, Clone)]
 pub struct Block {
@@ -63,7 +64,7 @@ mod tests {
     fn test_creation() {
         let mut block = Block::new(None);
         let keypair = Keypair::generate(&mut rand::rngs::OsRng {});
-        let tx = Transaction::new(TransactionData::CreateAccount("alice".to_string(), keypair.public), None);
+        let tx = Transaction::new(TransactionData::CreateAccount("alice".to_string(), keypair.public), None, SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs() as u128);
         block.set_nonce(1);
         block.add_transaction(tx);
 
@@ -74,7 +75,7 @@ mod tests {
     fn test_hash() {
         let mut block = Block::new(None);
         let keypair = Keypair::generate(&mut rand::rngs::OsRng {});
-        let tx = Transaction::new(TransactionData::CreateAccount("alice".to_string(), keypair.public), None);
+        let tx = Transaction::new(TransactionData::CreateAccount("alice".to_string(), keypair.public), None, SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs() as u128);
         block.set_nonce(1);
 
         let hash1 = block.hash();
